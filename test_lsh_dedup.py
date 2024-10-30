@@ -4,7 +4,7 @@ import unittest
 
 from lsh_dedup import MinHashLSH, DeduplicationIndex
 
-TEST_FILE = "test/resources/texts.csv"
+TEST_FILE = "test_resources/texts.csv"
 
 def _read_csv_records():
     with open(TEST_FILE, "r") as src:

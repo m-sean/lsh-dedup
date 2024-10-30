@@ -1,0 +1,60 @@
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python_version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+      - name: Run tests
+        run: |
+          pip install -r requirements.txt
+          pip install .
+          python3 -m pytest
+
+  release:
+    if: "startsWith(github.ref, 'refs/tags/')"
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        python_version: ["3.8", "3.10", "3.11"]
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-latest
+            target: armv7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist-${{ matrix.python_version }} -i python${{ matrix.python_version }}
+          sccache: 'true'
+          manylinux: auto
+      - name: Push to S3
+        uses: prewk/s3-cp-action@v2
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          source: dist-${{ matrix.python_version }}/*${{ matrix.platform.target }}*.whl
+          dest: s3://converseon-wheels/lsh-dedup/
+
